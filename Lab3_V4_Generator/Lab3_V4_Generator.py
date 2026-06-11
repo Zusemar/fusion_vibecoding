@@ -33,14 +33,37 @@ def identity_transform(origin=(0, 0, 0)):
     return matrix
 
 
-def basis_transform(origin, x_axis, y_axis, z_axis):
+def cross_product(left, right):
+    return (
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    )
+
+
+def dot_product(left, right):
+    return sum(a * b for a, b in zip(left, right))
+
+
+def basis_transform(origin, x_axis, y_axis):
+    z_axis = cross_product(x_axis, y_axis)
+    if (
+        not math.isclose(dot_product(x_axis, x_axis), 1.0)
+        or not math.isclose(dot_product(y_axis, y_axis), 1.0)
+        or not math.isclose(dot_product(z_axis, z_axis), 1.0)
+        or not math.isclose(dot_product(x_axis, y_axis), 0.0, abs_tol=1e-9)
+    ):
+        raise ValueError('Transform axes must be perpendicular unit vectors.')
+
     matrix = adsk.core.Matrix3D.create()
-    matrix.setWithCoordinateSystem(
+    succeeded = matrix.setWithCoordinateSystem(
         point(*origin),
         vector(*x_axis),
         vector(*y_axis),
         vector(*z_axis),
     )
+    if not succeeded:
+        raise RuntimeError('Fusion failed to create the component transform.')
     return matrix
 
 
@@ -222,7 +245,6 @@ def build_task_2(app):
             (0, 0, 0),
             (1, 0, 0),
             (0, 0, 1),
-            (0, -1, 0),
         ),
         holes=wall_holes,
     )
@@ -246,9 +268,8 @@ def build_task_2(app):
             (80, 180, 8),
             transform=basis_transform(
                 (x_pos, 0, -90),
-                (1, 0, 0),
+                (-1, 0, 0),
                 (0, 0, 1),
-                (0, 1, 0),
             ),
             holes=[(0, 40, 12), (0, -40, 12)],
         )
@@ -261,7 +282,6 @@ def build_task_2(app):
                 (x_pos - 5, 0, -8),
                 (0, 1, 0),
                 (0, 0, 1),
-                (1, 0, 0),
             ),
         )
 
@@ -275,7 +295,6 @@ def build_task_2(app):
                     (x_pos, -10, z_pos),
                     (1, 0, 0),
                     (0, 0, -1),
-                    (0, 1, 0),
                 ),
             )
 
