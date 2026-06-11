@@ -17,6 +17,8 @@ TASK_3_GEAR_MODULE = 10
 TASK_3_TOOTH_HEIGHT_FACTOR = 0.7
 TASK_3_CENTER_CLEARANCE = 1.2
 TASK_3_PROFILE_SAMPLES = 128
+TASK_4_GEAR_MODULE = 14
+TASK_4_TOOTH_HEIGHT_FACTOR = 0.65
 TASK_6_GEAR_TEETH = (4, 8)
 TASK_6_GEAR_MODULE = 10
 TASK_6_CENTER_CLEARANCE = 10
@@ -481,11 +483,12 @@ def build_task_3(app):
 
 def build_task_4(app):
     _, root = make_design(app)
-    add_gear(
+    add_rounded_gear(
         root,
-        'OPTIMIZATION CANDIDATE — 4 teeth',
-        4,
-        14,
+        'OPTIMIZATION CANDIDATE — 4 ROUNDED teeth',
+        VARIANT,
+        TASK_4_GEAR_MODULE,
+        TASK_4_TOOTH_HEIGHT_FACTOR,
         14,
         12,
         (0, 0, 0),
@@ -493,6 +496,7 @@ def build_task_4(app):
     add_label(root, (0, -90, 2))
     return (
         'Task 4 created.\n\n'
+        'The optimization candidate uses the same rounded tooth family as Task 3.\n'
         'Create Shape Optimization. Preserve the bore and tooth contact faces;\n'
         'apply a torque to the bore and tangential loads to the tooth faces.'
     )

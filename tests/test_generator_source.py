@@ -132,6 +132,17 @@ class GeneratorSourceTests(unittest.TestCase):
         self.assertGreaterEqual(self.constants['TASK_3_PROFILE_SAMPLES'], 96)
         self.assertFalse(self._polygons_intersect(first, second))
 
+    def test_task_4_uses_rounded_optimization_candidate(self):
+        source = GENERATOR.read_text(encoding='utf-8')
+
+        self.assertIn("'OPTIMIZATION CANDIDATE — 4 ROUNDED teeth'", source)
+        self.assertIn('TASK_4_GEAR_MODULE', self.constants)
+        self.assertIn('TASK_4_TOOTH_HEIGHT_FACTOR', self.constants)
+        self.assertGreater(
+            self.constants['TASK_4_GEAR_MODULE'],
+            self.constants['TASK_3_GEAR_MODULE'],
+        )
+
     def test_task_6_simplified_gears_have_clearance(self):
         teeth_1, teeth_2 = self.constants['TASK_6_GEAR_TEETH']
         module = self.constants['TASK_6_GEAR_MODULE']
