@@ -199,17 +199,17 @@ def add_label(root, origin, angle_deg=0):
     return component
 
 
-def make_design(app, document_name):
+def make_design(app):
     app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.DirectDesignType
     root = design.rootComponent
-    root.name = document_name
+    # Fusion owns the root component name and raises an error if it is changed.
     return design, root
 
 
 def build_task_2(app):
-    _, root = make_design(app, 'Task 2 — Shelf static stress — Variant 4')
+    _, root = make_design(app)
     bracket_x = (-400, -135, 135, 400)
     bolt_z = (-50, -130)
     wall_holes = [(x, z, 12) for x in bracket_x for z in bolt_z]
@@ -288,7 +288,7 @@ def build_task_2(app):
 
 
 def build_task_3(app):
-    _, root = make_design(app, 'Task 3 — Gear static stress — Variant 4')
+    _, root = make_design(app)
     module = 10
     pitch_radius = module * VARIANT / 2
     outer_radius = pitch_radius + module
@@ -314,7 +314,7 @@ def build_task_3(app):
 
 
 def build_task_4(app):
-    _, root = make_design(app, 'Task 4 — Shape optimization — Variant 4')
+    _, root = make_design(app)
     add_gear(
         root,
         'OPTIMIZATION CANDIDATE — 4 teeth',
@@ -333,7 +333,7 @@ def build_task_4(app):
 
 
 def build_task_5(app):
-    _, root = make_design(app, 'Task 5 — Dynamic impact — Variant 4')
+    _, root = make_design(app)
     add_box(
         root,
         f'IMPACT PLATE — {VARIANT_MATERIAL} — 10 mm',
@@ -361,7 +361,7 @@ def build_task_5(app):
 
 
 def build_task_6(app):
-    _, root = make_design(app, 'Task 6 — Mechanism kinematics — Variant 4')
+    _, root = make_design(app)
     module = 10
     gear_1_radius = module * 4 / 2
     gear_2_radius = module * 8 / 2
