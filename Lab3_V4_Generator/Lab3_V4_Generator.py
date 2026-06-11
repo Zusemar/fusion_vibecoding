@@ -12,6 +12,9 @@ BRACKET_X_POSITIONS = (-360, 0, 360)
 WALL_ANCHOR_X_OFFSETS = (-35, 35)
 WALL_ANCHOR_Z_POSITIONS = (-45, -145)
 SHELF_SCREW_Y_POSITIONS = (75, 210)
+TASK_6_GEAR_TEETH = (4, 8)
+TASK_6_GEAR_MODULE = 10
+TASK_6_CENTER_CLEARANCE = 10
 
 
 def mm(value):
@@ -476,13 +479,32 @@ def build_task_5(app):
 
 def build_task_6(app):
     _, root = make_design(app)
-    module = 10
-    gear_1_radius = module * 4 / 2
-    gear_2_radius = module * 8 / 2
-    gear_2_x = gear_1_radius + gear_2_radius
+    gear_1_teeth, gear_2_teeth = TASK_6_GEAR_TEETH
+    module = TASK_6_GEAR_MODULE
+    gear_1_radius = module * gear_1_teeth / 2
+    gear_2_radius = module * gear_2_teeth / 2
+    # Four-tooth simplified gears need extra center clearance to avoid overlap.
+    gear_2_x = gear_1_radius + gear_2_radius + TASK_6_CENTER_CLEARANCE
 
-    add_gear(root, 'GEAR 1 — 4 teeth — DRIVER', 4, module, 10, 8, (0, 0, 0))
-    add_gear(root, 'GEAR 2 — 8 teeth — DRIVEN', 8, module, 10, 10, (gear_2_x, 0, 0), 22.5)
+    add_gear(
+        root,
+        'GEAR 1 — 4 teeth — DRIVER',
+        gear_1_teeth,
+        module,
+        10,
+        8,
+        (0, 0, 0),
+    )
+    add_gear(
+        root,
+        'GEAR 2 — 8 teeth — DRIVEN',
+        gear_2_teeth,
+        module,
+        10,
+        10,
+        (gear_2_x, 0, 0),
+        22.5,
+    )
     add_cylinder(root, 'AXLE 1 — Ground', 8, 18, identity_transform((0, 0, -4)))
     add_cylinder(root, 'AXLE 2 — Ground', 10, 18, identity_transform((gear_2_x, 0, -4)))
     add_cylinder(
@@ -522,8 +544,8 @@ def build_task_6(app):
     add_label(root, (gear_2_x + 70, -90, 2))
     return (
         'Task 6 created.\n\n'
-        'Ground both axles. Add Revolute joints to both gears and rod ends, a Slider joint to the slider,\n'
-        'then Motion Link: 360 deg on gear 1 = -180 deg on gear 2.'
+        'Quick start: Ground AXLE 1, AXLE 2, and SLIDER GUIDE; add Revolute joints;\n'
+        'add Motion Link 360 deg = -180 deg; then Drive Joint on GEAR 1.'
     )
 
 

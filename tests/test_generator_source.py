@@ -1,4 +1,5 @@
 import ast
+import math
 from pathlib import Path
 import unittest
 
@@ -104,6 +105,97 @@ class GeneratorSourceTests(unittest.TestCase):
         self.assertIn("'ANCHOR {index}", source)
         self.assertIn("'SHELF SCREW {index}", source)
         self.assertIn('add_washer(', source)
+
+    def test_task_6_simplified_gears_have_clearance(self):
+        teeth_1, teeth_2 = self.constants['TASK_6_GEAR_TEETH']
+        module = self.constants['TASK_6_GEAR_MODULE']
+        clearance = self.constants['TASK_6_CENTER_CLEARANCE']
+        center_distance = module * (teeth_1 + teeth_2) / 2 + clearance
+        outer_radius_sum = (
+            module * teeth_1 / 2
+            + module
+            + module * teeth_2 / 2
+            + module
+        )
+
+        self.assertEqual(center_distance, 70)
+        self.assertGreater(center_distance, module * (teeth_1 + teeth_2) / 2)
+        self.assertLess(center_distance, outer_radius_sum)
+
+    def test_task_6_gear_outlines_do_not_intersect_during_one_driver_turn(self):
+        teeth_1, teeth_2 = self.constants['TASK_6_GEAR_TEETH']
+        module = self.constants['TASK_6_GEAR_MODULE']
+        center_distance = (
+            module * (teeth_1 + teeth_2) / 2
+            + self.constants['TASK_6_CENTER_CLEARANCE']
+        )
+
+        for step in range(129):
+            driver_angle = 360 * step / 128
+            driven_angle = 22.5 - driver_angle / 2
+            driver = self._gear_outline(teeth_1, module, 8, 0, driver_angle)
+            driven = self._gear_outline(
+                teeth_2,
+                module,
+                10,
+                center_distance,
+                driven_angle,
+            )
+            self.assertFalse(self._polygons_intersect(driver, driven))
+
+    @staticmethod
+    def _gear_outline(teeth, module, bore, center_x, angle_degrees):
+        pitch_radius = module * teeth / 2
+        outer_radius = pitch_radius + module
+        root_radius = max(bore * 0.8, pitch_radius - 1.25 * module)
+        angular_pitch = 2 * math.pi / teeth
+        rotation = math.radians(angle_degrees)
+        outline = []
+
+        for tooth in range(teeth):
+            center_angle = tooth * angular_pitch + rotation
+            for fraction, radius in (
+                (-0.50, root_radius),
+                (-0.30, root_radius),
+                (-0.19, outer_radius),
+                (0.19, outer_radius),
+                (0.30, root_radius),
+            ):
+                angle = center_angle + fraction * angular_pitch
+                outline.append(
+                    (
+                        center_x + radius * math.cos(angle),
+                        radius * math.sin(angle),
+                    )
+                )
+
+        return outline
+
+    @classmethod
+    def _polygons_intersect(cls, first, second):
+        return any(
+            cls._segments_intersect(
+                first[first_index],
+                first[(first_index + 1) % len(first)],
+                second[second_index],
+                second[(second_index + 1) % len(second)],
+            )
+            for first_index in range(len(first))
+            for second_index in range(len(second))
+        )
+
+    @staticmethod
+    def _segments_intersect(a, b, c, d):
+        def orientation(start, end, point):
+            return (
+                (end[0] - start[0]) * (point[1] - start[1])
+                - (end[1] - start[1]) * (point[0] - start[0])
+            )
+
+        return (
+            orientation(a, b, c) * orientation(a, b, d) < 0
+            and orientation(c, d, a) * orientation(c, d, b) < 0
+        )
 
     @staticmethod
     def _targets(node):
