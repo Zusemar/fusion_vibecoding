@@ -12,13 +12,15 @@ BRACKET_X_POSITIONS = (-360, 0, 360)
 WALL_ANCHOR_X_OFFSETS = (-35, 35)
 WALL_ANCHOR_Z_POSITIONS = (-45, -145)
 SHELF_SCREW_Y_POSITIONS = (75, 210)
-TASK_3_GEAR_TEETH = 4
-TASK_3_GEAR_MODULE = 10
-TASK_3_TOOTH_HEIGHT_FACTOR = 0.7
-TASK_3_CENTER_CLEARANCE = 1.2
-TASK_3_PROFILE_SAMPLES = 128
-TASK_4_GEAR_MODULE = 14
-TASK_4_TOOTH_HEIGHT_FACTOR = 0.65
+TASK_34_GEAR_TEETH = 4
+TASK_34_GEAR_MODULE = 8
+TASK_34_PRESSURE_ANGLE_DEG = 20
+TASK_34_ROOT_FILLET_MM = 0.5
+TASK_34_THICKNESS_MM = 10
+TASK_34_HOLE_DIAMETER_MM = 5
+TASK_34_CENTER_CLEARANCE = 2
+TASK_34_FLANK_SAMPLES = 10
+TASK_34_ROOT_SAMPLES = 7
 TASK_6_GEAR_TEETH = (4, 8)
 TASK_6_GEAR_MODULE = 10
 TASK_6_CENTER_CLEARANCE = 10
@@ -223,12 +225,94 @@ def add_gear(
     return component
 
 
-def add_rounded_gear(
+def involute_angle(angle_rad):
+    return math.tan(angle_rad) - angle_rad
+
+
+def reference_spur_gear_outline(
+    teeth,
+    module_mm,
+    pressure_angle_deg,
+    bore_mm,
+    root_fillet_mm,
+):
+    pitch_radius = module_mm * teeth / 2
+    base_radius = pitch_radius * math.cos(math.radians(pressure_angle_deg))
+    outer_radius = pitch_radius + module_mm
+    root_radius = max(
+        pitch_radius - 1.25 * module_mm,
+        bore_mm / 2 + 2 * root_fillet_mm,
+    )
+    angular_pitch = 2 * math.pi / teeth
+    pitch_half_tooth_angle = math.pi / (2 * teeth)
+    pitch_involute = involute_angle(math.radians(pressure_angle_deg))
+
+    def flank_angle(radius):
+        radius_angle = math.acos(base_radius / radius)
+        return (
+            pitch_half_tooth_angle
+            + pitch_involute
+            - involute_angle(radius_angle)
+        )
+
+    base_angle = flank_angle(base_radius)
+    outer_angle = flank_angle(outer_radius)
+    outline = []
+
+    for tooth in range(teeth):
+        center_angle = tooth * angular_pitch
+
+        for index in range(TASK_34_ROOT_SAMPLES):
+            ratio = index / (TASK_34_ROOT_SAMPLES - 1)
+            smooth_ratio = ratio * ratio * (3 - 2 * ratio)
+            angle = (
+                center_angle
+                - angular_pitch / 2
+                + (angular_pitch / 2 - base_angle) * smooth_ratio
+            )
+            radius = root_radius + (base_radius - root_radius) * smooth_ratio
+            outline.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+        for index in range(1, TASK_34_FLANK_SAMPLES):
+            ratio = index / (TASK_34_FLANK_SAMPLES - 1)
+            radius = base_radius + (outer_radius - base_radius) * ratio
+            angle = center_angle - flank_angle(radius)
+            outline.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+        outline.append(
+            (
+                outer_radius * math.cos(center_angle + outer_angle),
+                outer_radius * math.sin(center_angle + outer_angle),
+            )
+        )
+
+        for index in range(1, TASK_34_FLANK_SAMPLES):
+            ratio = index / (TASK_34_FLANK_SAMPLES - 1)
+            radius = outer_radius + (base_radius - outer_radius) * ratio
+            angle = center_angle + flank_angle(radius)
+            outline.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+        for index in range(1, TASK_34_ROOT_SAMPLES - 1):
+            ratio = index / (TASK_34_ROOT_SAMPLES - 1)
+            smooth_ratio = ratio * ratio * (3 - 2 * ratio)
+            angle = (
+                center_angle
+                + base_angle
+                + (angular_pitch / 2 - base_angle) * smooth_ratio
+            )
+            radius = base_radius + (root_radius - base_radius) * smooth_ratio
+            outline.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+    return outline
+
+
+def add_reference_spur_gear(
     root,
     name,
     teeth,
     module_mm,
-    tooth_height_factor,
+    pressure_angle_deg,
+    root_fillet_mm,
     thickness_mm,
     bore_mm,
     origin,
@@ -237,17 +321,17 @@ def add_rounded_gear(
     component = new_component(root, name, rotated_z_transform(origin, angle_deg))
     sketch = component.sketches.add(component.xYConstructionPlane)
     lines = sketch.sketchCurves.sketchLines
-    pitch_radius = module_mm * teeth / 2
-    tooth_height = module_mm * tooth_height_factor
-    outline = []
+    outline = reference_spur_gear_outline(
+        teeth,
+        module_mm,
+        pressure_angle_deg,
+        bore_mm,
+        root_fillet_mm,
+    )
+    sketch_points = [point(x, y) for x, y in outline]
 
-    for index in range(TASK_3_PROFILE_SAMPLES):
-        angle = 2 * math.pi * index / TASK_3_PROFILE_SAMPLES
-        radius = pitch_radius + tooth_height * math.cos(teeth * angle)
-        outline.append(point(radius * math.cos(angle), radius * math.sin(angle)))
-
-    for index, start in enumerate(outline):
-        lines.addByTwoPoints(start, outline[(index + 1) % len(outline)])
+    for index, start in enumerate(sketch_points):
+        lines.addByTwoPoints(start, sketch_points[(index + 1) % len(sketch_points)])
 
     sketch.sketchCurves.sketchCircles.addByCenterRadius(
         point(0, 0),
@@ -447,35 +531,37 @@ def build_task_2(app):
 
 def build_task_3(app):
     _, root = make_design(app)
-    teeth = TASK_3_GEAR_TEETH
-    module = TASK_3_GEAR_MODULE
+    teeth = TASK_34_GEAR_TEETH
+    module = TASK_34_GEAR_MODULE
     pitch_radius = module * teeth / 2
-    center_distance = 2 * pitch_radius + TASK_3_CENTER_CLEARANCE
-    add_rounded_gear(
+    center_distance = 2 * pitch_radius + TASK_34_CENTER_CLEARANCE
+    add_reference_spur_gear(
         root,
-        'GEAR A — 4 ROUNDED teeth — FIX BORE',
+        'GEAR A — 4 REFERENCE SPUR teeth — FIX BORE',
         teeth,
         module,
-        TASK_3_TOOTH_HEIGHT_FACTOR,
-        12,
-        10,
+        TASK_34_PRESSURE_ANGLE_DEG,
+        TASK_34_ROOT_FILLET_MM,
+        TASK_34_THICKNESS_MM,
+        TASK_34_HOLE_DIAMETER_MM,
         (0, 0, 0),
     )
-    add_rounded_gear(
+    add_reference_spur_gear(
         root,
-        'GEAR B — 4 ROUNDED teeth — APPLY TORQUE',
+        'GEAR B — 4 REFERENCE SPUR teeth — APPLY TORQUE',
         teeth,
         module,
-        TASK_3_TOOTH_HEIGHT_FACTOR,
-        12,
-        10,
+        TASK_34_PRESSURE_ANGLE_DEG,
+        TASK_34_ROOT_FILLET_MM,
+        TASK_34_THICKNESS_MM,
+        TASK_34_HOLE_DIAMETER_MM,
         (center_distance, 0, 0),
         45,
     )
     add_label(root, (center_distance / 2, -75, 2))
     return (
         'Task 3 created.\n\n'
-        'The rounded tooth profiles are phased tooth-to-gap with a 1.2 mm clearance.\n'
+        'Reference-style spur gears: 20 deg pressure angle, flat tips, rounded roots, 4 teeth.\n'
         'Assign Steel, create a Static Stress study, fix bore A, apply torque to bore B,\n'
         'and define Separation contact between the contacting tooth faces.'
     )
@@ -483,20 +569,21 @@ def build_task_3(app):
 
 def build_task_4(app):
     _, root = make_design(app)
-    add_rounded_gear(
+    add_reference_spur_gear(
         root,
-        'OPTIMIZATION CANDIDATE — 4 ROUNDED teeth',
-        VARIANT,
-        TASK_4_GEAR_MODULE,
-        TASK_4_TOOTH_HEIGHT_FACTOR,
-        14,
-        12,
+        'OPTIMIZATION CANDIDATE — 4 REFERENCE SPUR teeth',
+        TASK_34_GEAR_TEETH,
+        TASK_34_GEAR_MODULE,
+        TASK_34_PRESSURE_ANGLE_DEG,
+        TASK_34_ROOT_FILLET_MM,
+        TASK_34_THICKNESS_MM,
+        TASK_34_HOLE_DIAMETER_MM,
         (0, 0, 0),
     )
     add_label(root, (0, -90, 2))
     return (
         'Task 4 created.\n\n'
-        'The optimization candidate uses the same rounded tooth family as Task 3.\n'
+        'The candidate matches the reference Spur Gear family and uses 4 teeth for variant 4.\n'
         'Create Shape Optimization. Preserve the bore and tooth contact faces;\n'
         'apply a torque to the bore and tangential loads to the tooth faces.'
     )
