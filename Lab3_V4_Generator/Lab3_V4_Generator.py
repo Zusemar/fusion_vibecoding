@@ -8,6 +8,10 @@ STUDENT = 'Александр Василенко — вариант 4'
 VARIANT = 4
 VARIANT_MATERIAL = 'PBT plastic'
 VARIANT_LOAD_N = 400
+BRACKET_X_POSITIONS = (-360, 0, 360)
+WALL_ANCHOR_X_OFFSETS = (-35, 35)
+WALL_ANCHOR_Z_POSITIONS = (-45, -145)
+SHELF_SCREW_Y_POSITIONS = (75, 210)
 
 
 def mm(value):
@@ -144,6 +148,16 @@ def add_cylinder(root, name, diameter, depth, transform):
     return component
 
 
+def add_washer(root, name, outer_diameter, inner_diameter, depth, transform):
+    component = new_component(root, name, transform)
+    sketch = component.sketches.add(component.xYConstructionPlane)
+    circles = sketch.sketchCurves.sketchCircles
+    circles.addByCenterRadius(point(0, 0), mm(outer_diameter / 2))
+    circles.addByCenterRadius(point(0, 0), mm(inner_diameter / 2))
+    extrude_profile(component, largest_profile(sketch), depth, name)
+    return component
+
+
 def add_triangle_prism(root, name, points_xy, depth, transform):
     component = new_component(root, name, transform)
     sketch = component.sketches.add(component.xYConstructionPlane)
@@ -233,9 +247,17 @@ def make_design(app):
 
 def build_task_2(app):
     _, root = make_design(app)
-    bracket_x = (-400, -135, 135, 400)
-    bolt_z = (-50, -130)
-    wall_holes = [(x, z, 12) for x in bracket_x for z in bolt_z]
+    wall_holes = [
+        (bracket_x + x_offset, z_position, 12)
+        for bracket_x in BRACKET_X_POSITIONS
+        for x_offset in WALL_ANCHOR_X_OFFSETS
+        for z_position in WALL_ANCHOR_Z_POSITIONS
+    ]
+    shelf_holes = [
+        (bracket_x, y_position - 150, 10)
+        for bracket_x in BRACKET_X_POSITIONS
+        for y_position in SHELF_SCREW_Y_POSITIONS
+    ]
 
     add_box(
         root,
@@ -253,55 +275,128 @@ def build_task_2(app):
         'SHELF — Steel — APPLY 400 N DOWN',
         (1000, 300, 3),
         origin=(0, 150, 0),
+        holes=shelf_holes,
     )
 
-    for index, x_pos in enumerate(bracket_x, start=1):
-        add_box(
+    for index, x_pos in enumerate(BRACKET_X_POSITIONS, start=1):
+        bracket = new_component(
             root,
-            f'BRACKET {index} HORIZONTAL — {VARIANT_MATERIAL}',
-            (80, 250, 8),
-            origin=(x_pos, 125, -8),
+            f'BRACKET {index} — ONE-PIECE RIBBED {VARIANT_MATERIAL}',
+            identity_transform((x_pos, 0, 0)),
         )
         add_box(
-            root,
-            f'BRACKET {index} VERTICAL — {VARIANT_MATERIAL}',
-            (80, 180, 8),
+            bracket,
+            'HORIZONTAL SUPPORT PLATE — Bonded inside bracket',
+            (130, 270, 10),
+            origin=(0, 135, -10),
+            holes=[
+                (0, y_position - 135, 10)
+                for y_position in SHELF_SCREW_Y_POSITIONS
+            ],
+        )
+        add_box(
+            bracket,
+            'WALL MOUNTING PLATE — Bonded inside bracket',
+            (130, 210, 10),
             transform=basis_transform(
-                (x_pos, 0, -90),
+                (0, 0, -95),
                 (-1, 0, 0),
                 (0, 0, 1),
             ),
-            holes=[(0, 40, 12), (0, -40, 12)],
+            holes=[
+                (x_offset, z_position + 95, 12)
+                for x_offset in WALL_ANCHOR_X_OFFSETS
+                for z_position in WALL_ANCHOR_Z_POSITIONS
+            ],
         )
-        add_triangle_prism(
-            root,
-            f'BRACKET {index} RIB — {VARIANT_MATERIAL}',
-            [(0, 0), (210, 0), (0, -150)],
-            10,
-            basis_transform(
-                (x_pos - 5, 0, -8),
-                (0, 1, 0),
-                (0, 0, 1),
-            ),
-        )
-
-        for bolt_index, z_pos in enumerate(bolt_z, start=1):
-            add_cylinder(
-                root,
-                f'BOLT {index}.{bolt_index} — Steel — BONDED',
-                12,
-                18,
+        for rib_index, rib_x in enumerate((-50, 42), start=1):
+            add_triangle_prism(
+                bracket,
+                f'SIDE RIB {rib_index} — Bonded inside bracket',
+                [(0, 0), (250, 0), (0, -170)],
+                8,
                 basis_transform(
-                    (x_pos, -10, z_pos),
+                    (rib_x, 0, -10),
+                    (0, 1, 0),
+                    (0, 0, 1),
+                ),
+            )
+
+        for x_offset in WALL_ANCHOR_X_OFFSETS:
+            for z_position in WALL_ANCHOR_Z_POSITIONS:
+                fastener_name = (
+                    f'ANCHOR {index}.{x_offset:+d}.{abs(z_position)}'
+                )
+                anchor_x = x_pos + x_offset
+                anchor_transform = basis_transform(
+                    (anchor_x, -10, z_position),
                     (1, 0, 0),
                     (0, 0, -1),
-                ),
+                )
+                add_cylinder(
+                    root,
+                    f'{fastener_name} SHANK — Steel — BONDED',
+                    12,
+                    22,
+                    anchor_transform,
+                )
+                add_washer(
+                    root,
+                    f'{fastener_name} WASHER — EXCLUDE FROM SIMULATION',
+                    28,
+                    12,
+                    2,
+                    basis_transform(
+                        (anchor_x, 10, z_position),
+                        (1, 0, 0),
+                        (0, 0, -1),
+                    ),
+                )
+                add_cylinder(
+                    root,
+                    f'{fastener_name} HEAD — EXCLUDE FROM SIMULATION',
+                    22,
+                    8,
+                    basis_transform(
+                        (anchor_x, 12, z_position),
+                        (1, 0, 0),
+                        (0, 0, -1),
+                    ),
+                )
+
+        for screw_index, y_position in enumerate(
+            SHELF_SCREW_Y_POSITIONS,
+            start=1,
+        ):
+            screw_name = f'SHELF SCREW {index}.{screw_index}'
+            add_cylinder(
+                root,
+                f'{screw_name} SHANK — Steel — BONDED',
+                10,
+                15,
+                identity_transform((x_pos, y_position, -10)),
+            )
+            add_washer(
+                root,
+                f'{screw_name} WASHER — EXCLUDE FROM SIMULATION',
+                24,
+                10,
+                2,
+                identity_transform((x_pos, y_position, 3)),
+            )
+            add_cylinder(
+                root,
+                f'{screw_name} HEAD — EXCLUDE FROM SIMULATION',
+                18,
+                6,
+                identity_transform((x_pos, y_position, 5)),
             )
 
     add_label(root, (0, 340, 5))
     return (
         'Task 2 created.\n\n'
-        'Assign PBT plastic to all BRACKET components and Steel to wall, shelf, bolts.\n'
+        'Assign PBT plastic to all BRACKET assemblies and Steel to wall, shelf, and fastener shanks.\n'
+        'Exclude decorative fastener heads and washers from the simulation.\n'
         'Static Stress: fix rear wall face, apply 400 N downward to shelf, then set contacts per README.'
     )
 

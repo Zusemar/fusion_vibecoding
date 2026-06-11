@@ -14,6 +14,14 @@ class GeneratorSourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tree = ast.parse(GENERATOR.read_text(encoding='utf-8'))
+        cls.constants = {
+            node.targets[0].id: ast.literal_eval(node.value)
+            for node in cls.tree.body
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, (ast.Tuple, ast.Constant))
+        }
 
     def test_make_design_does_not_rename_root_component(self):
         make_design = next(
@@ -77,6 +85,25 @@ class GeneratorSourceTests(unittest.TestCase):
                 sum(left * right for left, right in zip(x_axis, y_axis)),
                 0.0,
             )
+
+    def test_task_2_uses_realistic_fastener_layout(self):
+        bracket_positions = self.constants['BRACKET_X_POSITIONS']
+        anchor_x_offsets = self.constants['WALL_ANCHOR_X_OFFSETS']
+        anchor_z_positions = self.constants['WALL_ANCHOR_Z_POSITIONS']
+        shelf_screw_positions = self.constants['SHELF_SCREW_Y_POSITIONS']
+
+        self.assertEqual(len(bracket_positions), 3)
+        self.assertEqual(len(anchor_x_offsets) * len(anchor_z_positions), 4)
+        self.assertEqual(len(shelf_screw_positions), 2)
+
+    def test_task_2_contains_twin_ribs_and_visible_fastener_hardware(self):
+        source = GENERATOR.read_text(encoding='utf-8')
+
+        self.assertIn("enumerate((-50, 42), start=1)", source)
+        self.assertIn("'SIDE RIB {rib_index}", source)
+        self.assertIn("'ANCHOR {index}", source)
+        self.assertIn("'SHELF SCREW {index}", source)
+        self.assertIn('add_washer(', source)
 
     @staticmethod
     def _targets(node):
