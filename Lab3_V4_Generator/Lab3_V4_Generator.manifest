@@ -1,0 +1,11 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "script",
+  "author": "Alexander Vasilenko",
+  "description": {
+    "": "Generates the Fusion 360 models for OM ID lab 3, variant 4."
+  },
+  "version": "1.0.0",
+  "runOnStartup": false,
+  "supportedOS": "windows|mac"
+}
