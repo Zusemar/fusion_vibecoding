@@ -106,6 +106,32 @@ class GeneratorSourceTests(unittest.TestCase):
         self.assertIn("'SHELF SCREW {index}", source)
         self.assertIn('add_washer(', source)
 
+    def test_task_3_rounded_gears_do_not_intersect(self):
+        teeth = self.constants['TASK_3_GEAR_TEETH']
+        module = self.constants['TASK_3_GEAR_MODULE']
+        tooth_height_factor = self.constants['TASK_3_TOOTH_HEIGHT_FACTOR']
+        center_distance = (
+            module * teeth
+            + self.constants['TASK_3_CENTER_CLEARANCE']
+        )
+        first = self._rounded_gear_outline(
+            teeth,
+            module,
+            tooth_height_factor,
+            0,
+            0,
+        )
+        second = self._rounded_gear_outline(
+            teeth,
+            module,
+            tooth_height_factor,
+            center_distance,
+            45,
+        )
+
+        self.assertGreaterEqual(self.constants['TASK_3_PROFILE_SAMPLES'], 96)
+        self.assertFalse(self._polygons_intersect(first, second))
+
     def test_task_6_simplified_gears_have_clearance(self):
         teeth_1, teeth_2 = self.constants['TASK_6_GEAR_TEETH']
         module = self.constants['TASK_6_GEAR_MODULE']
@@ -170,6 +196,36 @@ class GeneratorSourceTests(unittest.TestCase):
                 )
 
         return outline
+
+    @staticmethod
+    def _rounded_gear_outline(
+        teeth,
+        module,
+        tooth_height_factor,
+        center_x,
+        angle_degrees,
+    ):
+        pitch_radius = module * teeth / 2
+        tooth_height = module * tooth_height_factor
+        rotation = math.radians(angle_degrees)
+        samples = 256
+
+        return [
+            (
+                center_x
+                + (
+                    pitch_radius
+                    + tooth_height * math.cos(teeth * (angle - rotation))
+                )
+                * math.cos(angle),
+                (
+                    pitch_radius
+                    + tooth_height * math.cos(teeth * (angle - rotation))
+                )
+                * math.sin(angle),
+            )
+            for angle in (2 * math.pi * index / samples for index in range(samples))
+        ]
 
     @classmethod
     def _polygons_intersect(cls, first, second):

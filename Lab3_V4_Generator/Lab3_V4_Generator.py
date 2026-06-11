@@ -12,6 +12,11 @@ BRACKET_X_POSITIONS = (-360, 0, 360)
 WALL_ANCHOR_X_OFFSETS = (-35, 35)
 WALL_ANCHOR_Z_POSITIONS = (-45, -145)
 SHELF_SCREW_Y_POSITIONS = (75, 210)
+TASK_3_GEAR_TEETH = 4
+TASK_3_GEAR_MODULE = 10
+TASK_3_TOOTH_HEIGHT_FACTOR = 0.7
+TASK_3_CENTER_CLEARANCE = 1.2
+TASK_3_PROFILE_SAMPLES = 128
 TASK_6_GEAR_TEETH = (4, 8)
 TASK_6_GEAR_MODULE = 10
 TASK_6_CENTER_CLEARANCE = 10
@@ -216,6 +221,40 @@ def add_gear(
     return component
 
 
+def add_rounded_gear(
+    root,
+    name,
+    teeth,
+    module_mm,
+    tooth_height_factor,
+    thickness_mm,
+    bore_mm,
+    origin,
+    angle_deg=0,
+):
+    component = new_component(root, name, rotated_z_transform(origin, angle_deg))
+    sketch = component.sketches.add(component.xYConstructionPlane)
+    lines = sketch.sketchCurves.sketchLines
+    pitch_radius = module_mm * teeth / 2
+    tooth_height = module_mm * tooth_height_factor
+    outline = []
+
+    for index in range(TASK_3_PROFILE_SAMPLES):
+        angle = 2 * math.pi * index / TASK_3_PROFILE_SAMPLES
+        radius = pitch_radius + tooth_height * math.cos(teeth * angle)
+        outline.append(point(radius * math.cos(angle), radius * math.sin(angle)))
+
+    for index, start in enumerate(outline):
+        lines.addByTwoPoints(start, outline[(index + 1) % len(outline)])
+
+    sketch.sketchCurves.sketchCircles.addByCenterRadius(
+        point(0, 0),
+        mm(bore_mm / 2),
+    )
+    extrude_profile(component, largest_profile(sketch), thickness_mm, name)
+    return component
+
+
 def add_label(root, origin, angle_deg=0):
     component = new_component(
         root,
@@ -406,17 +445,26 @@ def build_task_2(app):
 
 def build_task_3(app):
     _, root = make_design(app)
-    module = 10
-    pitch_radius = module * VARIANT / 2
-    outer_radius = pitch_radius + module
-    root_radius = max(10 * 0.8, pitch_radius - 1.25 * module)
-    center_distance = outer_radius + root_radius
-    add_gear(root, 'GEAR A — 4 teeth — FIX BORE', 4, module, 12, 10, (0, 0, 0))
-    add_gear(
+    teeth = TASK_3_GEAR_TEETH
+    module = TASK_3_GEAR_MODULE
+    pitch_radius = module * teeth / 2
+    center_distance = 2 * pitch_radius + TASK_3_CENTER_CLEARANCE
+    add_rounded_gear(
         root,
-        'GEAR B — 4 teeth — APPLY TORQUE',
-        4,
+        'GEAR A — 4 ROUNDED teeth — FIX BORE',
+        teeth,
         module,
+        TASK_3_TOOTH_HEIGHT_FACTOR,
+        12,
+        10,
+        (0, 0, 0),
+    )
+    add_rounded_gear(
+        root,
+        'GEAR B — 4 ROUNDED teeth — APPLY TORQUE',
+        teeth,
+        module,
+        TASK_3_TOOTH_HEIGHT_FACTOR,
         12,
         10,
         (center_distance, 0, 0),
@@ -425,6 +473,7 @@ def build_task_3(app):
     add_label(root, (center_distance / 2, -75, 2))
     return (
         'Task 3 created.\n\n'
+        'The rounded tooth profiles are phased tooth-to-gap with a 1.2 mm clearance.\n'
         'Assign Steel, create a Static Stress study, fix bore A, apply torque to bore B,\n'
         'and define Separation contact between the contacting tooth faces.'
     )
